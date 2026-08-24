@@ -10,13 +10,16 @@
             disabled: "插件已停用",
             refresh: "修改设置后，请刷新已经打开的网页使其生效。",
             allow: "在此网站启用",
-            block: "屏蔽此网站",
+            block: "在该网站禁用",
             settingsEntry: "网站匹配设置",
             active: host => `${host} 已允许加载插件`,
             inactive: host => `${host} 当前不会加载插件`,
             unsupported: "当前页面不支持网站匹配",
-            allowed: "已加入开启列表，并切换为仅开启列表模式。",
-            blocked: "已加入屏蔽列表，并切换为屏蔽列表模式。",
+            addedAllowlist: "已将网站加入开启列表。",
+            removedAllowlist: "已移除该网站相关的开启列表规则。",
+            removedBlocklist: "已移除该网站相关的屏蔽列表规则。",
+            addedBlocklist: "已将网站加入屏蔽列表。",
+            unavailable: "请先在设置中选择开启列表或屏蔽列表模式。",
             failed: message => `操作失败：${message}`,
             settingsTitle: "网站匹配设置",
             settingsDescription: "使用完整 URL 的 JavaScript 正则表达式控制插件加载范围。",
@@ -45,13 +48,16 @@
             disabled: "Extension disabled",
             refresh: "Refresh open pages after changing settings.",
             allow: "Enable on this site",
-            block: "Block this site",
+            block: "Disable on this site",
             settingsEntry: "Website matching",
             active: host => `${host} is allowed to load the extension`,
             inactive: host => `${host} will not load the extension`,
             unsupported: "Website matching is unavailable on this page",
-            allowed: "Added to the allowlist and switched to allowlist mode.",
-            blocked: "Added to the blocklist and switched to blocklist mode.",
+            addedAllowlist: "Added this website to the allowlist.",
+            removedAllowlist: "Removed all matching allowlist rules for this website.",
+            removedBlocklist: "Removed all matching blocklist rules for this website.",
+            addedBlocklist: "Added this website to the blocklist.",
+            unavailable: "Choose allowlist or blocklist mode in settings first.",
             failed: message => `Failed: ${message}`,
             settingsTitle: "Website matching",
             settingsDescription: "Control extension loading with JavaScript regular expressions matched against full URLs.",
@@ -78,6 +84,7 @@
     const extensionSwitch = document.getElementById("extensionSwitch");
     const allowButton = document.getElementById("allowCurrentSite");
     const blockButton = document.getElementById("blockCurrentSite");
+    const quickActions = document.getElementById("quickActions");
     const mainView = document.getElementById("mainView");
     const settingsView = document.getElementById("settingsView");
     const siteStatus = document.getElementById("siteStatus");
@@ -144,10 +151,15 @@
         if (currentUrlObject == undefined) {
             siteStatus.textContent = strings.unsupported;
             siteStatus.dataset.state = "unsupported";
+            quickActions.hidden = true;
             allowButton.disabled = true;
             blockButton.disabled = true;
             return;
         }
+
+        quickActions.hidden = settings.mode == policy.Mode.All;
+        allowButton.disabled = false;
+        blockButton.disabled = false;
 
         const active = policy.isUrlEnabled(currentUrl, settings);
         siteStatus.textContent = active
@@ -177,32 +189,46 @@
         await refreshMainState();
     });
 
-    async function updateCurrentSite(targetMode) {
+    async function updateCurrentSite(action) {
         try {
             const settings = await policy.getSettings();
+            if (settings.mode == policy.Mode.All) {
+                setMessage("mainMessage", strings.unavailable, true);
+                return;
+            }
             const pattern = policy.patternForSite(currentUrl);
-            const allowlist = [...settings.allowlist];
-            const blocklist = [...settings.blocklist];
-            if (targetMode == policy.Mode.Allowlist) {
-                if (!policy.matches(currentUrl, allowlist)) {
-                    allowlist.push(pattern);
+            if (settings.mode == policy.Mode.Allowlist) {
+                if (action == "enable") {
+                    const allowlist = [...settings.allowlist];
+                    if (!policy.matches(currentUrl, allowlist)) {
+                        allowlist.push(pattern);
+                    }
+                    await policy.storageSet({
+                        [policy.StorageKey.Allowlist]: allowlist
+                    });
+                    setMessage("mainMessage", strings.addedAllowlist);
+                } else {
+                    await policy.storageSet({
+                        [policy.StorageKey.Allowlist]: policy.removeMatchingPatterns(currentUrl, settings.allowlist)
+                    });
+                    setMessage("mainMessage", strings.removedAllowlist);
                 }
-                await policy.storageSet({
-                    [policy.StorageKey.Enabled]: true,
-                    [policy.StorageKey.Mode]: policy.Mode.Allowlist,
-                    [policy.StorageKey.Allowlist]: allowlist
-                });
-                setMessage("mainMessage", strings.allowed);
             } else {
-                if (!policy.matches(currentUrl, blocklist)) {
-                    blocklist.push(pattern);
+                if (action == "enable") {
+                    await policy.storageSet({
+                        [policy.StorageKey.Blocklist]: policy.removeMatchingPatterns(currentUrl, settings.blocklist)
+                    });
+                    setMessage("mainMessage", strings.removedBlocklist);
+                } else {
+                    const blocklist = [...settings.blocklist];
+                    if (!policy.matches(currentUrl, blocklist)) {
+                        blocklist.push(pattern);
+                    }
+                    await policy.storageSet({
+                        [policy.StorageKey.Blocklist]: blocklist
+                    });
+                    setMessage("mainMessage", strings.addedBlocklist);
                 }
-                await policy.storageSet({
-                    [policy.StorageKey.Enabled]: true,
-                    [policy.StorageKey.Mode]: policy.Mode.Blocklist,
-                    [policy.StorageKey.Blocklist]: blocklist
-                });
-                setMessage("mainMessage", strings.blocked);
             }
             await refreshMainState();
         } catch (error) {
@@ -248,8 +274,8 @@
         }
     });
 
-    allowButton.addEventListener("click", () => updateCurrentSite(policy.Mode.Allowlist));
-    blockButton.addEventListener("click", () => updateCurrentSite(policy.Mode.Blocklist));
+    allowButton.addEventListener("click", () => updateCurrentSite("enable"));
+    blockButton.addEventListener("click", () => updateCurrentSite("disable"));
 
     showView("main");
     await refreshMainState();

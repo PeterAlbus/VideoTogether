@@ -109,6 +109,10 @@
         });
     }
 
+    function removeMatchingPatterns(url, patterns) {
+        return patterns.filter(pattern => !matches(url, [pattern]));
+    }
+
     function isForcedEnabledUrl(urlString) {
         try {
             const url = new URL(urlString);
@@ -203,6 +207,7 @@
         storageGet: storageGet,
         storageSet: storageSet,
         matches: matches,
+        removeMatchingPatterns: removeMatchingPatterns,
         isForcedEnabledUrl: isForcedEnabledUrl,
         isUrlEnabled: isUrlEnabled,
         isCurrentTabEnabled: isCurrentTabEnabled,

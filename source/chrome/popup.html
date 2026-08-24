@@ -219,6 +219,10 @@
             margin-top: 12px;
         }
 
+        .quick-actions[hidden] {
+            display: none;
+        }
+
         .button {
             min-height: 40px;
             padding: 9px 12px;
@@ -493,7 +497,7 @@
             <p id="siteStatus"></p>
         </div>
 
-        <div class="quick-actions">
+        <div id="quickActions" class="quick-actions" hidden>
             <button id="allowCurrentSite" class="button button-allow" type="button"></button>
             <button id="blockCurrentSite" class="button button-block" type="button"></button>
         </div>

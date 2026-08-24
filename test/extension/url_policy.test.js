@@ -72,6 +72,19 @@ test("blocklist mode disables only matching URLs", () => {
     assert.equal(policy.isUrlEnabled("https://video.example.com/watch/1", settings), true);
 });
 
+test("removes every list rule matching the current URL", () => {
+    const { policy } = loadPolicy();
+    const patterns = [
+        "^https://video\\.example\\.com/",
+        "example\\.com",
+        "^https://other\\.example\\.com/"
+    ];
+    assert.deepEqual(
+        policy.removeMatchingPatterns("https://video.example.com/watch/1", patterns),
+        ["^https://other\\.example\\.com/"]
+    );
+});
+
 test("the official setting directory is enabled regardless of global and URL rules", () => {
     const { policy } = loadPolicy();
     const settings = {
